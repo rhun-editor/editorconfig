@@ -1,0 +1,26 @@
+# rhun PROJECT --headless --extensions DIR --script tests/basic.txt (tests/run.sh sets it up).
+# Two waits after an open: the first tick sends the opened event, the second reads the reply.
+wait 100
+print-options
+open proj/notes.txt
+wait-ext editorconfig running
+wait 500
+print-options
+open proj/main.go
+wait 300
+wait 300
+print-options
+cmd editorconfig.show
+wait 300
+print-toast
+open proj/sub/readme.md
+wait 300
+wait 300
+print-options
+open proj/Makefile
+wait 300
+wait 300
+print-options
+key ctrl+Tab
+print-state
+print-options

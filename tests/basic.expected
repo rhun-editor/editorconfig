@@ -1,0 +1,9 @@
+tab_width=4 insert_spaces=1 trim_trailing_whitespace=0 final_newline=1
+ext=editorconfig state=running
+tab_width=2 insert_spaces=1 trim_trailing_whitespace=1 final_newline=1
+tab_width=8 insert_spaces=0 trim_trailing_whitespace=1 final_newline=1
+toast=EditorConfig: insert_spaces=no tab_width=8 trim_trailing_whitespace=yes
+tab_width=3 insert_spaces=1 trim_trailing_whitespace=1 final_newline=0
+tab_width=2 insert_spaces=0 trim_trailing_whitespace=1 final_newline=1
+tabs=4 active=notes.txt line=1 col=1 sel=0 dirty=0 lang=none focus=0 theme=rhun-dark
+tab_width=2 insert_spaces=1 trim_trailing_whitespace=1 final_newline=1
