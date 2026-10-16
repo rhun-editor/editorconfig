@@ -20,8 +20,9 @@ Command: **Show EditorConfig Settings** says what applies to the current file.
 
 ## Needs
 
-Project: read (the `.editorconfig` files). Nothing else: the extension changes settings
-through rhun, never files.
+Project: read (the `.editorconfig` files). Documents: write, because the trim-on-save and
+final-newline options change what rhun writes to disk (the extension itself never edits text
+or touches a file).
 
 ## Build and test
 
