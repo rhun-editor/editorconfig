@@ -98,15 +98,29 @@ func (x *ext) apply(e *rhunext.Ext, doc rhunext.Doc) {
 }
 
 // root is the folder the lookup stops at: the workspace folder the file is in (protocol 1.1), else
-// the project when the file is in it; "" (the file system's root) otherwise.
+// the project when the file is in it; "" (the file system's root) otherwise. rhun writes Windows
+// paths with forward slashes (C:/w/app), so both sides are cleaned to the system's form first.
 func (x *ext) root(path string) string {
+	path = filepath.Clean(path)
 	best := ""
 	for _, f := range append(x.folders, x.project) {
-		if f != "" && strings.HasPrefix(path, f+string(filepath.Separator)) && len(f) > len(best) {
+		if f == "" {
+			continue
+		}
+		f = filepath.Clean(f)
+		if within(path, f) && len(f) > len(best) {
 			best = f
 		}
 	}
 	return best
+}
+
+// within: path is below dir (both cleaned); a root such as / or C:\ ends in the separator already
+func within(path, dir string) bool {
+	if !strings.HasSuffix(dir, string(filepath.Separator)) {
+		dir += string(filepath.Separator)
+	}
+	return strings.HasPrefix(path, dir)
 }
 
 func (x *ext) Run(e *rhunext.Ext, command string, doc rhunext.Doc) {
@@ -181,7 +195,7 @@ func lookup(path, root string) map[string]string {
 	dir := filepath.Dir(path)
 	for {
 		files = append(files, filepath.Join(dir, ".editorconfig"))
-		if root != "" && (dir == root || !strings.HasPrefix(dir, root+string(filepath.Separator))) {
+		if root != "" && (dir == root || !within(dir, root)) {
 			break
 		}
 		parent := filepath.Dir(dir)

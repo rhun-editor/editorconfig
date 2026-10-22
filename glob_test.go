@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestGlob(t *testing.T) {
 	cases := []struct {
@@ -51,8 +55,36 @@ func TestRoot(t *testing.T) {
 		"/w/library/x.go":    "",              // not in /w/lib
 		"/elsewhere/x.go":    "",
 	} {
-		if got := x.root(path); got != want {
+		if got := filepath.ToSlash(x.root(path)); got != want {
 			t.Errorf("root(%q) = %q, want %q", path, got, want)
 		}
+	}
+	// Windows paths as rhun writes them: a drive and forward slashes
+	x = &ext{project: "C:/w/app", folders: []string{"C:/w/app", "C:/w/lib"}}
+	for path, want := range map[string]string{
+		"C:/w/app/main.go":  "C:/w/app",
+		"C:/w/lib/a/b.go":   "C:/w/lib",
+		"C:/w/library/x.go": "",
+	} {
+		if got := filepath.ToSlash(x.root(path)); got != want {
+			t.Errorf("root(%q) = %q, want %q", path, got, want)
+		}
+	}
+}
+
+func TestLookupStopsAtTheRoot(t *testing.T) {
+	top := t.TempDir()
+	app := filepath.Join(top, "app")
+	if err := os.MkdirAll(filepath.Join(app, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// above the workspace folder: must not apply
+	os.WriteFile(filepath.Join(top, ".editorconfig"), []byte("[*]\nindent_style = tab\n"), 0o644)
+	os.WriteFile(filepath.Join(app, ".editorconfig"), []byte("[*]\nindent_size = 3\n"), 0o644)
+	file := filepath.ToSlash(filepath.Join(app, "src", "x.go")) // as rhun writes it
+	x := &ext{project: filepath.ToSlash(app)}
+	got := lookup(file, x.root(file))
+	if got["indent_size"] != "3" || got["indent_style"] != "" {
+		t.Errorf("lookup = %v, want indent_size 3 and nothing from above the folder", got)
 	}
 }
