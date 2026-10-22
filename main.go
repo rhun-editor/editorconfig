@@ -1,9 +1,11 @@
 // editorconfig: applies .editorconfig to every document rhun opens, through rhun's per-document
 // options: indent_style and indent_size/tab_width, trim_trailing_whitespace and
-// insert_final_newline. Files are read from the document's folder up to the project root (or a
-// section with root = true); later files and later sections win, as the EditorConfig
-// specification says. Nothing is written anywhere.
-// Protocol: https://rhun.app/extensions/v1/
+// insert_final_newline. Files are read from the document's folder up to the root of its
+// workspace folder (or a section with root = true); later files and later sections win, as the
+// EditorConfig specification says. When a .editorconfig changes on disk, the open documents get
+// their settings again. Nothing is written anywhere.
+// Protocol: https://rhun.app/extensions/v1/ and its 1.1 features workspace-folders (each folder of
+// the window is a root) and workspace_watch (the .editorconfig files are read again on a change).
 package main
 
 import (
@@ -20,36 +22,91 @@ import (
 
 type ext struct {
 	project string
-	applied map[rhunext.Doc]map[string]string // what was sent, for the show command
+	folders []string                          // the window's workspace folders (protocol 1.1)
+	paths   map[rhunext.Doc]string            // the open documents with a path
+	applied map[rhunext.Doc]map[string]string // what was sent, for the show command and changes
 }
 
 func (x *ext) Ready(e *rhunext.Ext, project string) {
 	x.project = project
+	x.paths = map[rhunext.Doc]string{}
 	x.applied = map[rhunext.Doc]map[string]string{}
+	if e.Has(rhunext.FeatureWorkspaceWatch) && project != "" {
+		if _, err := e.WatchWorkspace(); err != nil {
+			e.Logf("watch: %v", err)
+		}
+	}
 }
 
 func (x *ext) Event(e *rhunext.Ext, ev rhunext.Event) {
+	if folders, ok := rhunext.ParseFolders(ev); ok {
+		// before ready, and again when they change; a folder of another kind (remote) is left out
+		x.folders = x.folders[:0]
+		for _, f := range folders {
+			if f.Location == "local" {
+				x.folders = append(x.folders, f.Path)
+			}
+		}
+		return
+	}
+	if _, _, ok := rhunext.ParseWorkspaceWatch(ev); ok {
+		// something changed in the workspace: maybe a .editorconfig, so every open document again
+		for doc := range x.paths {
+			x.apply(e, doc)
+		}
+		return
+	}
 	switch ev.Name {
 	case "opened":
 		o, ok := rhunext.ParseOpened(ev)
 		if !ok || o.Path == "" {
 			return
 		}
-		props := lookup(o.Path, x.project)
-		opts := options(props)
-		for key, value := range opts {
-			if err := e.Option(o.Doc, key, value); err != nil {
-				e.Logf("option %s %s: %v", key, value, err)
-			}
-		}
-		x.applied[o.Doc] = opts
+		x.paths[o.Doc] = o.Path
+		x.apply(e, o.Doc)
 	case "closed":
 		var id int64
 		if len(ev.Args) > 0 {
 			fmt.Sscan(ev.Args[0], &id)
 		}
+		delete(x.paths, rhunext.Doc(id))
 		delete(x.applied, rhunext.Doc(id))
 	}
+}
+
+// apply sends the options that apply to a document now, and "-" for those that no longer do.
+func (x *ext) apply(e *rhunext.Ext, doc rhunext.Doc) {
+	path := x.paths[doc]
+	opts := options(lookup(path, x.root(path)))
+	before := x.applied[doc]
+	for key, value := range opts {
+		if before[key] == value {
+			continue
+		}
+		if err := e.Option(doc, key, value); err != nil {
+			e.Logf("option %s %s: %v", key, value, err)
+		}
+	}
+	for key := range before {
+		if _, still := opts[key]; !still {
+			if err := e.Option(doc, key, "-"); err != nil {
+				e.Logf("option %s -: %v", key, err)
+			}
+		}
+	}
+	x.applied[doc] = opts
+}
+
+// root is the folder the lookup stops at: the workspace folder the file is in (protocol 1.1), else
+// the project when the file is in it; "" (the file system's root) otherwise.
+func (x *ext) root(path string) string {
+	best := ""
+	for _, f := range append(x.folders, x.project) {
+		if f != "" && strings.HasPrefix(path, f+string(filepath.Separator)) && len(f) > len(best) {
+			best = f
+		}
+	}
+	return best
 }
 
 func (x *ext) Run(e *rhunext.Ext, command string, doc rhunext.Doc) {
@@ -116,14 +173,15 @@ func yesNo(v string) (string, bool) {
 	return "", false
 }
 
-// lookup collects the properties that apply to the file: the .editorconfig files from the root
-// (or the first with root = true) down to the file's folder, each file's sections in order.
-func lookup(path, project string) map[string]string {
+// lookup collects the properties that apply to the file: the .editorconfig files from root ("":
+// the file system's root), or the first with root = true, down to the file's folder, each file's
+// sections in order.
+func lookup(path, root string) map[string]string {
 	var files []string
 	dir := filepath.Dir(path)
 	for {
 		files = append(files, filepath.Join(dir, ".editorconfig"))
-		if project != "" && (dir == project || !strings.HasPrefix(dir, project+string(filepath.Separator))) {
+		if root != "" && (dir == root || !strings.HasPrefix(dir, root+string(filepath.Separator))) {
 			break
 		}
 		parent := filepath.Dir(dir)
@@ -324,7 +382,8 @@ func glob(p, s string) bool {
 }
 
 func main() {
-	if err := rhunext.Run(&ext{}); err != nil {
+	features := []string{rhunext.FeatureWorkspaceFolders, rhunext.FeatureWorkspaceWatch}
+	if err := rhunext.RunWith(features, &ext{}); err != nil {
 		os.Exit(1)
 	}
 }

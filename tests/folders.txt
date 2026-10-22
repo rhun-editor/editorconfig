@@ -1,0 +1,31 @@
+# rhun proj other --headless --extensions DIR --script tests/folders.txt (tests/run.sh sets it up).
+# Two workspace folders: other/ is a root of its own, so the .editorconfig above both folders does
+# not reach x.txt (its final newline stays the user's).
+wait 100
+open other/deep/x.txt
+wait-ext editorconfig running
+wait 500
+print-options
+cmd editorconfig.show
+wait 300
+print-toast
+open proj/notes.txt
+wait 300
+wait 300
+print-options
+# a section added to proj/.editorconfig and saved applies to notes.txt, still open
+open proj/.editorconfig
+wait 300
+key ctrl+End
+type [*.txt]
+key Return
+type indent_size = 6
+key Return
+key ctrl+s
+wait 500
+wait 500
+wait 500
+open proj/notes.txt
+wait 300
+print-state
+print-options

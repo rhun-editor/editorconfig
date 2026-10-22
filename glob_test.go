@@ -41,3 +41,18 @@ func TestOptions(t *testing.T) {
 		t.Errorf("size only: tab_width = %q, want 3", got["tab_width"])
 	}
 }
+
+func TestRoot(t *testing.T) {
+	x := &ext{project: "/w/app", folders: []string{"/w/app", "/w/lib", "/w/app/vendor"}}
+	for path, want := range map[string]string{
+		"/w/app/main.go":     "/w/app",
+		"/w/lib/a/b.go":      "/w/lib",
+		"/w/app/vendor/x.go": "/w/app/vendor", // the nearest folder
+		"/w/library/x.go":    "",              // not in /w/lib
+		"/elsewhere/x.go":    "",
+	} {
+		if got := x.root(path); got != want {
+			t.Errorf("root(%q) = %q, want %q", path, got, want)
+		}
+	}
+}
