@@ -40,7 +40,5 @@ extension itself never edits text or touches a file).
 `go test ./...` covers the globs and the property mapping. `tests/run.sh [RHUN]` builds the
 extension, lays it out as rhun installs it and opens files under two `.editorconfig` files in a
 headless rhun, checking the settings in force for each (`tests/basic.txt`), then two workspace
-folders and a `.editorconfig` edited and saved while a file is open (`tests/folders.txt`). Until
-SDK v1.4.0 is released, build with a `go.work` that uses a checkout of
-`rhun-editor/extension-protocol` (`GOWORK=…`). Releases are built by the reusable
-workflow from `rhun-editor/extension-template`.
+folders and a `.editorconfig` edited and saved while a file is open (`tests/folders.txt`).
+Releases are built by the reusable workflow from `rhun-editor/extension-template`.
